@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>糊塗機器人的時間大混亂！</title>
+    <style>
+        /* 頁面整體樣式 */
+        body {
+            font-family: 'Comic Sans MS', 'Microsoft JhengHei', sans-serif;
+            background-color: #eef7ff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            padding: 30px;
+            max-width: 550px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            color: #ff5722;
+            margin-bottom: 10px;
+        }
+
+        .progress-text {
+            color: #666;
+            font-size: 0.95rem;
+            margin-bottom: 15px;
+        }
+
+        .robot-card {
+            background-color: #fff9c4;
+            border: 3px dashed #fbc02d;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 15px 0;
+            font-size: 1.3rem;
+            color: #333;
+            line-height: 1.5;
+        }
+
+        .robot-avatar {
+            font-size: 3.5rem;
+            margin-bottom: 10px;
+        }
+
+        .options {
+            margin: 25px 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .btn {
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+            transform: scale(1.05);
+        }
+
+        .btn-wrong {
+            background-color: #f44336;
+        }
+
+        .btn-next {
+            background-color: #2196f3;
+            display: none;
+            margin-top: 15px;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            display: none;
+            text-align: left;
+        }
+
+        .result.correct {
+            background-color: #e8f5e9;
+            color: #1b5e20;
+            border: 2px solid #81c784;
+        }
+
+        .result.incorrect {
+            background-color: #ffebee;
+            color: #b71c1c;
+            border: 2px solid #e57373;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🤖 糊塗機器人教錯囉！</h1>
+    <p>機器人常常把「秒」和「分鐘」搞亂，請判斷下面這句話是對還是錯：</p>
+    
+    <!-- 進度顯示區 -->
+    <div id="progress" class="progress-text">進度：0 / 0</div>
+
+    <!-- 題目展示區 -->
+    <div class="robot-card">
+        <div class="robot-avatar">🤖</div>
+        <div id="question-text">載入題目中...</div>
+    </div>
+
+    <!-- 按鈕答題區 -->
+    <div id="quiz-area">
+        <div class="options">
+            <button class="btn" onclick="submitAnswer(true)">✅ 對的</button>
+            <button class="btn btn-wrong" onclick="submitAnswer(false)">❌ 錯的</button>
+        </div>
+    </div>
+
+    <!-- 反饋解析區 -->
+    <div id="result-box" class="result"></div>
+
+    <!-- 下一題 / 重新開始按鈕 -->
+    <button id="next-btn" class="btn btn-next" onclick="loadNextQuestion()">下一題 ➔</button>
+</div>
+
+<script>
+    // 預設題目庫
+    const rawQuestionBank = [
+        {
+            statement: "我今天用了 20 秒（即 2 分鐘 ）洗手！",
+            isCorrect: false,
+            explanation: "💡 觀念說明：1 分鐘 = 60 秒。所以 20秒 < 60 秒 ，不足 1分鐘喔！"
+        },
+        {
+            statement: "我微波加熱牛奶用了 1 分鐘，也就是 60 秒喔！",
+            isCorrect: true,
+            explanation: "💡 觀念說明：答對了！1 分鐘確實等於 60 秒！"
+        },
+        {
+            statement: "在400米跑步比賽，我跑了 2 分鐘，換算過來就是 120 秒！",
+            isCorrect: true,
+            explanation: "💡 觀念說明：答對了！2 分鐘就是 2 × 60 = 120 秒！"
+        },
+        {
+            statement: "我刷牙刷了 5 分鐘，也就是說我刷了 50 秒！",
+            isCorrect: false,
+            explanation: "💡 觀念說明：1 分鐘 = 60 秒。所以 5 分鐘應該是 5 × 60 = 300 秒才對喔！"
+        },
+        {
+            statement: "我聽了一首 3 分鐘的歌曲，等於聽了 180 秒的音樂！",
+            isCorrect: true,
+            explanation: "💡 觀念說明：答對了！3 分鐘等於 3 × 60 = 180 秒！"
+        },
+        {
+            statement: "做功課 10 分鐘，等於我做了 100 秒！",
+            isCorrect: false,
+            explanation: "💡 觀念說明：1 分鐘 = 60 秒。所以 10 分鐘應該是 10 × 60 = 600 秒才對喔！"
+        },
+        {
+            statement: "在100米跑步比賽，我跑了 11 秒，也就是 11 分鐘喔！",
+            isCorrect: false,
+            explanation: "💡 觀念說明：1 分鐘 = 60 秒。所以 11 秒 < 60 秒 ，不足 1分鐘喔！"
+        },
+        {
+            statement: "我用 1 分鐘完成一題乘法計算題目，等於用了 100 秒！",
+            isCorrect: false,
+            explanation: "💡 觀念說明：1 分鐘 = 60 秒！"
+        },
+        {
+            statement: "跳繩 30 秒，等於我跳了 半分鐘！",
+            isCorrect: true,
+            explanation: "💡 觀念說明：答對了！1 分鐘 = 60 秒。所以 半 分鐘是 60 ÷ 2 = 30 秒喔！"
+        }
+    ];
+
+    let currentQuestions = []; // 存放目前洗牌後的剩餘題目
+    let currentQuestion = null;
+    let totalQuestionsCount = 0;
+
+    // 初始化與洗牌演算法（Fisher-Yates Shuffle）
+    function initGame() {
+        // 複製一份題目庫，避免修改原始數據
+        currentQuestions = [...rawQuestionBank];
+        totalQuestionsCount = currentQuestions.length;
+
+        // 洗牌：隨機打亂題目順序
+        for (let i = currentQuestions.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [currentQuestions[i], currentQuestions[j]] = [currentQuestions[j], currentQuestions[i]];
+        }
+
+        loadNextQuestion();
+    }
+
+    // 抽下一題函數（不重複）
+    function loadNextQuestion() {
+        // 重設 UI
+        document.getElementById('result-box').style.display = 'none';
+        document.getElementById('next-btn').style.display = 'none';
+
+        // 檢查題目是否已經抽完
+        if (currentQuestions.length === 0) {
+            document.getElementById('question-text').innerText = "🎉 太棒了！你已經幫機器人改完所有的題目囉！";
+            document.getElementById('quiz-area').style.display = 'none';
+            document.getElementById('progress').innerText = `進度：${totalQuestionsCount} / ${totalQuestionsCount}`;
+            
+            // 顯示重新開始按鈕
+            const nextBtn = document.getElementById('next-btn');
+            nextBtn.innerText = "🔄 重新再挑戰一次";
+            nextBtn.onclick = function() {
+                document.getElementById('quiz-area').style.display = 'block';
+                nextBtn.innerText = "下一題 ➔";
+                nextBtn.onclick = loadNextQuestion;
+                initGame();
+            };
+            nextBtn.style.display = 'inline-block';
+            return;
+        }
+
+        // 從陣列最後取出非重複的一題
+        currentQuestion = currentQuestions.pop();
+
+        // 更新進度顯示
+        const currentNum = totalQuestionsCount - currentQuestions.length;
+        document.getElementById('progress').innerText = `進度：第 ${currentNum} 題 / 共 ${totalQuestionsCount} 題`;
+
+        // 渲染題目
+        document.getElementById('question-text').innerText = `「${currentQuestion.statement}」`;
+    }
+
+    // 檢查答案函數
+    function submitAnswer(userChoice) {
+        const resultBox = document.getElementById('result-box');
+
+        if (userChoice === currentQuestion.isCorrect) {
+            resultBox.className = "result correct";
+            resultBox.innerHTML = `🎉 <strong>太棒了！判斷正確！</strong><br>${currentQuestion.explanation}`;
+        } else {
+            resultBox.className = "result incorrect";
+            resultBox.innerHTML = `❌ <strong>哎呀，判斷錯囉！</strong><br>${currentQuestion.explanation}`;
+        }
+
+        resultBox.style.display = 'block';
+        document.getElementById('next-btn').style.display = 'inline-block';
+    }
+
+    // 網頁載入時啟動遊戲
+    window.onload = initGame;
+</script>
+
+</body>
+</html>
